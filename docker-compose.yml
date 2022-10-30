@@ -1,0 +1,86 @@
+version: '3.8'
+services:
+  db:
+    env_file: ./.env
+    # image: mariadb:10.6.4-focal
+    # command: '--default-authentication-plugin=mysql_native_password'
+    image: mysql:5.7
+    restart: always
+    volumes:
+      - db-data:/var/lib/mysql
+    # secrets:
+    #   - db-password
+    environment:
+      - MYSQL_DATABASE=$DATABASE_NAME
+      # - MYSQL_ROOT_PASSWORD_FILE=/run/secrets/db-password
+      - MYSQL_ROOT_PASSWORD=$DATABASE_PASSWORD
+    # ports:
+    #   - 3306:3306
+    networks:
+      - private
+  
+  backend:
+    env_file: ./.env
+    depends_on:
+      - db
+    build:
+      # args:
+      #   - NODE_ENV=development
+      context: backend
+    command: npm start
+    environment:
+      # - NODE_ENV=production
+      - PORT=3005
+      - DATABASE_HOST=db
+      - DATABASE_PORT=3306
+      - DATABASE_DB=$DATABASE_NAME
+      - DATABASE_USER=$DATABASE_USERNAME
+      # - DATABASE_PASSWORD=/run/secrets/db-password
+      - DATABASE_PASSWORD=$DATABASE_PASSWORD
+      - DATABASE_DIALECT=$DATABASE_DIALECT
+      - CLIENT_ORIGIN=$CLIENT_ORIGIN
+    ports:
+      - $EXT_BACKEND_PORT:3005
+      # - 9229:9229
+      # - 9230:9230
+    # secrets:
+    #   - db-password
+    volumes:
+      - ./backend/src:/code/src:ro
+      - ./backend/package.json:/code/package.json
+      - ./backend/package-lock.json:/code/package-lock.json
+      - backend-modules:/opt/app/node_modules
+    networks:
+      - private
+      - public
+  
+  frontend:
+    env_file: ./.env
+    depends_on:
+      - backend
+    build:
+      args:
+        - REACT_APP_API_BASE_URL=$CLIENT_API_BASE_URL
+      context: frontend
+      # target: development
+    environment:
+      - REACT_APP_API_BASE_URL=$CLIENT_API_BASE_URL
+    ports:
+      - $EXT_FRONTEND_PORT:80
+    volumes:
+      - ./frontend/src:/code/src
+      - /code/node_modules
+    networks:
+      - public
+
+networks: 
+  public:
+  private:
+
+volumes:
+  backend-modules:
+  db-data:
+
+# secrets:
+#   db-password:
+#     file: db/password.txt
